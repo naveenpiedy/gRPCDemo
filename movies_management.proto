@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package movies_management;
+
+// Defines the MoviesService with various RPC methods for movie management
+service MoviesService {
+  // Retrieves a movie by its name
+  rpc GetMovie (GetMovieRequest) returns (MovieResponse) {}
+
+  // Retrieves an actor by their ID or name
+  rpc GetActor (GetActorRequest) returns (ActorResponse) {}
+
+  // Adds a new movie and returns the details of the added movie
+  rpc AddMovie (AddMovieRequest) returns (AddMovieResponse) {}
+
+  // Changes the rating of a movie and returns the updated rating
+  rpc ChangeRating (ScoreRequest) returns (ScoreResponse) {}
+}
+
+// Request message for retrieving a movie by its name
+message GetMovieRequest {
+  string name = 1; // Name of the movie
+}
+
+// Request message for adding a new movie
+message AddMovieRequest {
+  string id = 1;            // Unique identifier for the movie
+  string name = 2;          // Name of the movie
+  repeated string actors = 3; // List of actors in the movie
+  string director = 4;      // Director of the movie
+  float rating = 5;         // Rating of the movie
+}
+
+// Response message for adding a new movie
+message AddMovieResponse {
+  string id = 1;            // Unique identifier for the movie
+  string name = 2;          // Name of the movie
+  repeated string actors = 3; // List of actors in the movie
+  string director = 4;      // Director of the movie
+  float rating = 5;         // Rating of the movie
+  string message = 6;       // Message indicating the success or failure of the operation
+}
+
+// Response message for retrieving a movie
+message MovieResponse {
+  string id = 1;            // Unique identifier for the movie
+  string name = 2;          // Name of the movie
+  repeated string actors = 3; // List of actors in the movie
+  string director = 4;      // Director of the movie
+  float rating = 5;         // Rating of the movie
+}
+
+// Request message for retrieving an actor by their ID or name
+message GetActorRequest {
+  string actor_name = 1;    // Name of the actor
+}
+
+// Response message for retrieving an actor
+message ActorResponse {
+  string id = 1;            // Unique identifier for the actor
+  string actor_name = 2;    // Name of the actor
+  repeated string movie_names = 3; // List of movies the actor has acted in
+}
+
+// Request message for adding a rating to a movie
+message ScoreRequest {
+  string movie_name = 1;    // Name of the movie being rated
+  float rating = 2;         // Rating score
+}
+
+// Response message for adding a rating to a movie
+message ScoreResponse {
+  string id = 1;            // Unique identifier for the rating
+  string movie_name = 2;    // Name of the movie being rated
+  float rating = 3;         // Updated rating score
+  string message = 4;       // Message indicating the success or failure of the operation
+}
