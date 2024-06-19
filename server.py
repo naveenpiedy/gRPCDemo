@@ -11,6 +11,8 @@ from db_mimic import movies_db, actors_db, Movie, Actor
 from interceptor import LoggingInterceptor
 from jwt_utils import verify_jwt
 
+from errors import NotFoundError, UnauthorizedError, InternalServerError, CustomError
+
 VALID_API_KEY = "secret-api-key"
 
 
@@ -58,8 +60,11 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request for movie: {request.name}")
 
-        user_id = self.validate_jwt(metadata, context)
-        if not user_id:
+        try:
+            self.validate_jwt(metadata, context)
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
             return movies_management_pb2.MovieResponse()
 
         try:
@@ -76,13 +81,14 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 )
             else:
                 # Movie not in database
-                context.set_code(grpc.StatusCode.NOT_FOUND)
-                context.set_details('Movie not found')
-                return movies_management_pb2.MovieResponse()
+                self.log_trace(metadata, f"Movie '{request.name}' not found")
+                raise NotFoundError(f"Movie '{request.name}' not found")
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return movies_management_pb2.MovieResponse()
         except Exception as e:
             self.log_trace(metadata, f"Error while getting movie: {e}")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('Internal server error')
             return movies_management_pb2.MovieResponse()
 
     def GetActor(self, request, context):
@@ -92,9 +98,12 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request for actor: {request.actor_name}")
 
-        user_id = self.validate_jwt(metadata, context)
-        if not user_id:
-            return movies_management_pb2.MovieResponse()
+        try:
+            self.validate_jwt(metadata, context)
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return movies_management_pb2.ActorResponse()
 
         try:
             actor_name = request.actor_name
@@ -110,11 +119,13 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details('Actor not in system')
                 return movies_management_pb2.ActorResponse
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return movies_management_pb2.ActorResponse()
         except Exception as e:
             self.log_trace(metadata, f"Error while getting actor: {e}")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('Internal server error')
-            return movies_management_pb2.ActorResponse
+            raise InternalServerError() from e
 
     def AddMovie(self, request, context):
         """
@@ -123,8 +134,11 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request to add movie: {request.name}")
 
-        user_id = self.validate_jwt(metadata, context)
-        if not user_id:
+        try:
+            self.validate_jwt(metadata, context)
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
             return movies_management_pb2.MovieResponse()
 
         try:
@@ -167,11 +181,13 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 rating=movie.rating,
                 message="Movie created successfully"
             )
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return movies_management_pb2.AddMovieResponse()
         except Exception as e:
             self.log_trace(metadata, f"Error while adding Movie: {e}")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(f"Internal server error: {e}")
-            return movies_management_pb2.AddMovieResponse(message='Internal server error')
+            raise InternalServerError() from e
 
     def ChangeRating(self, request, context):
         """
@@ -180,9 +196,12 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request to change rating for movie: {request.movie_name}")
 
-        user_id = self.validate_jwt(metadata, context)
-        if not user_id:
-            return movies_management_pb2.MovieResponse()
+        try:
+            self.validate_jwt(metadata, context)
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return movies_management_pb2.ScoreReponse()
 
         try:
             movie_name = request.movie_name
@@ -205,11 +224,14 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details('Movie not found. Cannot change rating')
                 return movies_management_pb2.ScoreResponse()
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return movies_management_pb2.ScoreResponse()
         except Exception as e:
             self.log_trace(metadata, f"Error while changing rating: {e}")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('Internal server error')
-            return movies_management_pb2.ScoreResponse(message='Internal server error')
+            raise InternalServerError() from e
+
 
     def GetMoviesByDirector(self, request, context):
         """
@@ -218,22 +240,31 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request for movies by director: {request.director}")
 
-        user_id = self.validate_jwt(metadata, context)
-        if not user_id:
-            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
-            context.set_details("Invalid API key")
+        try:
+            self.validate_jwt(metadata, context)
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
             return
 
-        director_name = request.director
-        for movie in movies_db.values():
-            if movie.director == director_name:
-                yield movies_management_pb2.MovieResponse(
-                    id=movie.id,
-                    name=movie.name,
-                    actors=movie.actors,
-                    director=movie.director,
-                    rating=movie.rating
-                )
+        try:
+            director_name = request.director
+            for movie in movies_db.values():
+                if movie.director == director_name:
+                    yield movies_management_pb2.MovieResponse(
+                        id=movie.id,
+                        name=movie.name,
+                        actors=movie.actors,
+                        director=movie.director,
+                        rating=movie.rating
+                    )
+        except CustomError as e:
+            context.set_code(e.code)
+            context.set_details(e.message)
+            return
+        except Exception as e:
+            self.log_trace(metadata, f"Error while streaming movies: {e}")
+            raise InternalServerError() from e
 
 
 def serve():
