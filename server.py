@@ -8,6 +8,7 @@ import logging
 import movies_management_pb2
 import movies_management_pb2_grpc
 from db_mimic import movies_db, actors_db, Movie, Actor
+from interceptor import LoggingInterceptor
 
 VALID_API_KEY = "secret-api-key"
 
@@ -223,9 +224,12 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 )
 
 
-
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    logging.basicConfig(level=logging.INFO)
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        interceptors=(LoggingInterceptor(),)  # Add the interceptor here
+    )
     movies_management_pb2_grpc.add_MoviesServiceServicer_to_server(MoviesService(), server)
     server.add_insecure_port('[::]:50051')
     server.start()
