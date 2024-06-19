@@ -60,6 +60,11 @@ class MoviesServiceStub(object):
                 request_serializer=movies__management__pb2.ScoreRequest.SerializeToString,
                 response_deserializer=movies__management__pb2.ScoreResponse.FromString,
                 _registered_method=True)
+        self.GetMoviesByDirector = channel.unary_stream(
+                '/movies_management.MoviesService/GetMoviesByDirector',
+                request_serializer=movies__management__pb2.GetMoviesByDirectorRequest.SerializeToString,
+                response_deserializer=movies__management__pb2.MovieResponse.FromString,
+                _registered_method=True)
 
 
 class MoviesServiceServicer(object):
@@ -94,6 +99,13 @@ class MoviesServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetMoviesByDirector(self, request, context):
+        """Get Movies by who directed a movie and stream the response
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_MoviesServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -116,6 +128,11 @@ def add_MoviesServiceServicer_to_server(servicer, server):
                     servicer.ChangeRating,
                     request_deserializer=movies__management__pb2.ScoreRequest.FromString,
                     response_serializer=movies__management__pb2.ScoreResponse.SerializeToString,
+            ),
+            'GetMoviesByDirector': grpc.unary_stream_rpc_method_handler(
+                    servicer.GetMoviesByDirector,
+                    request_deserializer=movies__management__pb2.GetMoviesByDirectorRequest.FromString,
+                    response_serializer=movies__management__pb2.MovieResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -227,6 +244,33 @@ class MoviesService(object):
             '/movies_management.MoviesService/ChangeRating',
             movies__management__pb2.ScoreRequest.SerializeToString,
             movies__management__pb2.ScoreResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMoviesByDirector(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/movies_management.MoviesService/GetMoviesByDirector',
+            movies__management__pb2.GetMoviesByDirectorRequest.SerializeToString,
+            movies__management__pb2.MovieResponse.FromString,
             options,
             channel_credentials,
             insecure,

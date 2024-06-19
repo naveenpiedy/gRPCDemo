@@ -50,6 +50,19 @@ def add_movie(id, movie_name, actors, director, rating):
             print(f"Failed to add Movie: {e}")
 
 
+def get_movie_by_director(director_name):
+    with grpc.insecure_channel('localhost:50051') as channel:
+        stub = movies_management_pb2_grpc.MoviesServiceStub(channel)
+
+        # Test GetMoviesByDirector with streaming
+        request = movies_management_pb2.GetMoviesByDirectorRequest(director=director_name)
+        try:
+            for response in stub.GetMoviesByDirector(request):
+                print(f"Movie by Joss Whedon: {response}")
+        except grpc.RpcError as e:
+            print(f"Error: {e.code()} - {e.details()}")
+
+
 def change_rating(movie_name, rating):
     try:
         with grpc.insecure_channel('localhost:50051') as channel:
@@ -148,6 +161,35 @@ def run():
     movie_name: "Minnale"
     rating: 5
     message: "Rating changed from 4.5 to 5.0"
+    """
+
+    add_movie('7', 'Serenity',  ["Nathan Fillion", "Gina Torres"], 'Joss Wheadon', 4.0)
+    """
+    Response:
+     id: "7"
+    name: "Serenity"
+    actors: "Nathan Fillion"
+    actors: "Gina Torres"
+    director: "Joss Wheadon"
+    rating: 4
+    message: "Movie created successfully"
+    """
+
+    get_movie_by_director('Joss Wheadon')
+    """
+    Movie by Joss Whedon: id: "1"
+    name: "Avengers"
+    actors: "Robert"
+    actors: "Chris"
+    director: "Joss Wheadon"
+    rating: 4.2
+
+    Movie by Joss Whedon: id: "7"
+    name: "Serenity"
+    actors: "Nathan Fillion"
+    actors: "Gina Torres"
+    director: "Joss Wheadon"
+    rating: 4
     """
 
 

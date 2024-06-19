@@ -142,6 +142,22 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
             context.set_details('Internal server error')
             return movies_management_pb2.ScoreResponse(message='Internal server error')
 
+    def GetMoviesByDirector(self, request, context):
+        """
+        Get movies by director and stream the response
+        """
+        director_name = request.director
+        for movie in movies_db.values():
+            if movie.director == director_name:
+                yield movies_management_pb2.MovieResponse(
+                    id=movie.id,
+                    name=movie.name,
+                    actors=movie.actors,
+                    director=movie.director,
+                    rating=movie.rating
+                )
+
+
 
 
 def serve():

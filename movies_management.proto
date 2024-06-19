@@ -15,6 +15,9 @@ service MoviesService {
 
   // Changes the rating of a movie and returns the updated rating
   rpc ChangeRating (ScoreRequest) returns (ScoreResponse) {}
+
+  // Get Movies by who directed a movie and stream the response
+   rpc GetMoviesByDirector (GetMoviesByDirectorRequest) returns (stream MovieResponse) {}
 }
 
 // Request message for retrieving a movie by its name
@@ -74,4 +77,9 @@ message ScoreResponse {
   string movie_name = 2;    // Name of the movie being rated
   float rating = 3;         // Updated rating score
   string message = 4;       // Message indicating the success or failure of the operation
+}
+
+// Request movies by director
+message GetMoviesByDirectorRequest {
+  string director = 1;      // Name of the director
 }
