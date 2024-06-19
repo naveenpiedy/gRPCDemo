@@ -9,6 +9,7 @@ import movies_management_pb2
 import movies_management_pb2_grpc
 from db_mimic import movies_db, actors_db, Movie, Actor
 from interceptor import LoggingInterceptor
+from jwt_utils import verify_jwt
 
 VALID_API_KEY = "secret-api-key"
 
@@ -23,19 +24,24 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         return dict(context.invocation_metadata())
 
     @staticmethod
-    def validate_api_key(metadata, context):
-        """
-        Validates API key from metadata
-        """
-        api_key = metadata.get('api-key')
+    def validate_jwt(metadata, context):
+        token = metadata.get('authorization')
         trace_id = metadata.get('trace-id')
 
-        if api_key != VALID_API_KEY:
+        if not token:
             context.set_code(grpc.StatusCode.UNAUTHENTICATED)
-            context.set_details("Invalid API key")
-            logging.warning(f"Invalid API key for trace ID: {trace_id}")
-            return False
-        return True
+            context.set_details("Missing JWT")
+            logging.warning(f"Missing JWT for trace ID: {trace_id}")
+            return None
+
+        user_id = verify_jwt(token)
+        if not user_id:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid or expired JWT")
+            logging.warning(f"Invalid or expired JWT for trace ID: {trace_id}")
+            return None
+
+        return user_id
 
     @staticmethod
     def log_trace(metadata, message):
@@ -52,7 +58,8 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request for movie: {request.name}")
 
-        if not self.validate_api_key(metadata, context):
+        user_id = self.validate_jwt(metadata, context)
+        if not user_id:
             return movies_management_pb2.MovieResponse()
 
         try:
@@ -85,7 +92,8 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request for actor: {request.actor_name}")
 
-        if not self.validate_api_key(metadata, context):
+        user_id = self.validate_jwt(metadata, context)
+        if not user_id:
             return movies_management_pb2.MovieResponse()
 
         try:
@@ -115,7 +123,8 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request to add movie: {request.name}")
 
-        if not self.validate_api_key(metadata, context):
+        user_id = self.validate_jwt(metadata, context)
+        if not user_id:
             return movies_management_pb2.MovieResponse()
 
         try:
@@ -171,8 +180,10 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request to change rating for movie: {request.movie_name}")
 
-        if not self.validate_api_key(metadata, context):
+        user_id = self.validate_jwt(metadata, context)
+        if not user_id:
             return movies_management_pb2.MovieResponse()
+
         try:
             movie_name = request.movie_name
             rating = request.rating
@@ -207,7 +218,8 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         metadata = self.get_metadata(context)
         self.log_trace(metadata, f"Received request for movies by director: {request.director}")
 
-        if not self.validate_api_key(metadata, context):
+        user_id = self.validate_jwt(metadata, context)
+        if not user_id:
             context.set_code(grpc.StatusCode.UNAUTHENTICATED)
             context.set_details("Invalid API key")
             return

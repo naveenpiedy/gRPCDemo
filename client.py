@@ -1,11 +1,19 @@
 # Created by NaveenPiedy at 6/18/2024 6:32 AM
+import uuid
 
 import grpc
 import movies_management_pb2
 import movies_management_pb2_grpc
+from jwt_utils import create_jwt
 
 
-def get_movies(name, metadata):
+def generate_trace_id():
+    return str(uuid.uuid4())
+
+
+def get_movies(name, metadata=None):
+    trace_id = generate_trace_id()
+    metadata.append(('trace-id', trace_id))
     try:
         with grpc.insecure_channel('localhost:50051') as channel:
             stub = movies_management_pb2_grpc.MoviesServiceStub(channel)
@@ -21,7 +29,9 @@ def get_movies(name, metadata):
             print(f"Unexpected error: {e}")
 
 
-def get_actors(name, metadata):
+def get_actors(name, metadata=None):
+    trace_id = generate_trace_id()
+    metadata.append(('trace-id', trace_id))
     try:
         with grpc.insecure_channel('localhost:50051') as channel:
             stub = movies_management_pb2_grpc.MoviesServiceStub(channel)
@@ -35,7 +45,9 @@ def get_actors(name, metadata):
             print(f"Unexpected error: {e}")
 
 
-def add_movie(id, movie_name, actors, director, rating, metadata):
+def add_movie(id, movie_name, actors, director, rating, metadata=None):
+    trace_id = generate_trace_id()
+    metadata.append(('trace-id', trace_id))
     try:
         with grpc.insecure_channel('localhost:50051') as channel:
             stub = movies_management_pb2_grpc.MoviesServiceStub(channel)
@@ -50,7 +62,9 @@ def add_movie(id, movie_name, actors, director, rating, metadata):
             print(f"Failed to add Movie: {e}")
 
 
-def get_movie_by_director(director_name, metadata):
+def get_movie_by_director(director_name, metadata=None):
+    trace_id = generate_trace_id()
+    metadata.append(('trace-id', trace_id))
     with grpc.insecure_channel('localhost:50051') as channel:
         stub = movies_management_pb2_grpc.MoviesServiceStub(channel)
 
@@ -63,7 +77,9 @@ def get_movie_by_director(director_name, metadata):
             print(f"Error: {e.code()} - {e.details()}")
 
 
-def change_rating(movie_name, rating, metadata):
+def change_rating(movie_name, rating, metadata=None):
+    trace_id = generate_trace_id()
+    metadata.append(('trace-id', trace_id))
     try:
         with grpc.insecure_channel('localhost:50051') as channel:
             stub = movies_management_pb2_grpc.MoviesServiceStub(channel)
@@ -78,21 +94,24 @@ def change_rating(movie_name, rating, metadata):
 
 
 def run():
-    metadata = [('api-key', 'secret-api-key')]
-    wrong_metadata = [('api-key', 'wrong-api-key')]
-    metadata_with_trace_id = [('api-key', 'secret-api-key'), ('trace-id', '12345')]
-    wrong_metadata_with_trace_id = [('api-key', 'wrong-api-key'), ('trace-id', '12345')]
+    # Generate a JWT for the request
+    jwt_token = create_jwt(user_id='user123')
+
+    # Metadata with JWT token
+    metadata = [('authorization', jwt_token)]
+    wrong_metadata = [('authorization', "jwt_token")]
 
     get_movies('Avengers', metadata=wrong_metadata)
-    """Response: 
-    Unexpected error: <_InactiveRpcError of RPC that terminated with: 
+
+    """
+    Unexpected error: <_InactiveRpcError of RPC that terminated with:
     status = StatusCode.UNAUTHENTICATED
-    details = "Invalid API key"
-    debug_error_string = "UNKNOWN:Error received from peer ipv6:%5B::1%5D:50051
-    {created_time:"2024-06-19T02:21:19.2151243+00:00", grpc_status:16, grpc_message:"Invalid API key"}"
+    details = "Invalid or expired JWT"
+    debug_error_string = "UNKNOWN:Error received from peer ipv6:%5B::1%5D:50051 
+    {created_time:"2024-06-19T03:17:05.1573384+00:00", grpc_status:16, grpc_message:"Invalid or expired JWT"}"
     """
 
-    get_movies('Avengers', metadata=wrong_metadata_with_trace_id)
+    get_movies('Avengers', metadata=metadata)
     """
     Server side logging:
     WARNING:root:Invalid API key for trace ID: 12345
