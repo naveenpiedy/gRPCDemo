@@ -23,7 +23,7 @@ This project implements a gRPC service for managing movies and actors, featuring
 1. Clone the repository:
     ```sh
     git clone https://github.com/naveenpiedy/gRPCDemo.git
-    cd movies-management-grpc
+    cd gRPCDemo
     ```
 
 2. Install dependencies:
