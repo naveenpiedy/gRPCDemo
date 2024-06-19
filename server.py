@@ -3,18 +3,57 @@ import pprint
 from concurrent import futures
 
 import grpc
+import logging
 
 import movies_management_pb2
 import movies_management_pb2_grpc
 from db_mimic import movies_db, actors_db, Movie, Actor
 
+VALID_API_KEY = "secret-api-key"
+
 
 class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
+
+    @staticmethod
+    def get_metadata(context):
+        """
+        Returns metadata of the request
+        """
+        return dict(context.invocation_metadata())
+
+    @staticmethod
+    def validate_api_key(metadata, context):
+        """
+        Validates API key from metadata
+        """
+        api_key = metadata.get('api-key')
+        trace_id = metadata.get('trace-id')
+
+        if api_key != VALID_API_KEY:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid API key")
+            logging.warning(f"Invalid API key for trace ID: {trace_id}")
+            return False
+        return True
+
+    @staticmethod
+    def log_trace(metadata, message):
+        """
+        Logs trace message
+        """
+        trace_id = metadata.get('trace-id', 'unknown')
+        logging.info(f"Trace ID: {trace_id} - {message}")
 
     def GetMovie(self, request, context):
         """
         Get movie details from database.
         """
+        metadata = self.get_metadata(context)
+        self.log_trace(metadata, f"Received request for movie: {request.name}")
+
+        if not self.validate_api_key(metadata, context):
+            return movies_management_pb2.MovieResponse()
+
         try:
             movie_name = request.name
             sanitized_movie_name = movie_name.lower()
@@ -33,6 +72,7 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 context.set_details('Movie not found')
                 return movies_management_pb2.MovieResponse()
         except Exception as e:
+            self.log_trace(metadata, f"Error while getting movie: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('Internal server error')
             return movies_management_pb2.MovieResponse()
@@ -41,6 +81,12 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         """
         Returns Actor details
         """
+        metadata = self.get_metadata(context)
+        self.log_trace(metadata, f"Received request for actor: {request.actor_name}")
+
+        if not self.validate_api_key(metadata, context):
+            return movies_management_pb2.MovieResponse()
+
         try:
             actor_name = request.actor_name
             sanitized_actor_name = actor_name.lower()
@@ -56,6 +102,7 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 context.set_details('Actor not in system')
                 return movies_management_pb2.ActorResponse
         except Exception as e:
+            self.log_trace(metadata, f"Error while getting actor: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('Internal server error')
             return movies_management_pb2.ActorResponse
@@ -64,6 +111,12 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         """
         Add a new movie to database
         """
+        metadata = self.get_metadata(context)
+        self.log_trace(metadata, f"Received request to add movie: {request.name}")
+
+        if not self.validate_api_key(metadata, context):
+            return movies_management_pb2.MovieResponse()
+
         try:
             id = request.id
             movie_name = request.name
@@ -96,9 +149,6 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                     last_actor_id += 1
                     actors_db[actor.lower()] = Actor(id=str(last_actor_id), actor_name=actor, movie_names=[movie_name])
 
-            pprint.pprint(movies_db)
-            pprint.pprint(actors_db)
-
             return movies_management_pb2.AddMovieResponse(
                 id=movie.id,
                 name=movie.name,
@@ -108,6 +158,7 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 message="Movie created successfully"
             )
         except Exception as e:
+            self.log_trace(metadata, f"Error while adding Movie: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Internal server error: {e}")
             return movies_management_pb2.AddMovieResponse(message='Internal server error')
@@ -116,6 +167,11 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         """
         Change the rating for a movie
         """
+        metadata = self.get_metadata(context)
+        self.log_trace(metadata, f"Received request to change rating for movie: {request.movie_name}")
+
+        if not self.validate_api_key(metadata, context):
+            return movies_management_pb2.MovieResponse()
         try:
             movie_name = request.movie_name
             rating = request.rating
@@ -138,6 +194,7 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                 context.set_details('Movie not found. Cannot change rating')
                 return movies_management_pb2.ScoreResponse()
         except Exception as e:
+            self.log_trace(metadata, f"Error while changing rating: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('Internal server error')
             return movies_management_pb2.ScoreResponse(message='Internal server error')
@@ -146,6 +203,14 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
         """
         Get movies by director and stream the response
         """
+        metadata = self.get_metadata(context)
+        self.log_trace(metadata, f"Received request for movies by director: {request.director}")
+
+        if not self.validate_api_key(metadata, context):
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid API key")
+            return
+
         director_name = request.director
         for movie in movies_db.values():
             if movie.director == director_name:
@@ -156,7 +221,6 @@ class MoviesService(movies_management_pb2_grpc.MoviesServiceServicer):
                     director=movie.director,
                     rating=movie.rating
                 )
-
 
 
 
